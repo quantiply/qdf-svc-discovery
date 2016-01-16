@@ -16,13 +16,19 @@ EOF
 
 sub main {
   &usage unless @ARGV;
+  my @args = @ARGV;
   my %cmds = (
     zookeeper => \&zookeeper,
     cluster => \&cluster
   );
-  my $cmd = shift(@ARGV);
-  die "Unknown command $cmd" unless exists $cmds{$cmd};
-  $cmds{$cmd}->(@ARGV);
+  &dispatch(\%cmds, \@args);
+}
+
+sub dispatch {
+  my ($cmds, $args) = @_;
+  my $cmd = shift(@$args);
+  &usage() unless exists $cmds->{$cmd};
+  $cmds->{$cmd}->(@$args);
 }
 
 sub zookeeper {
@@ -31,9 +37,7 @@ sub zookeeper {
     connectstr => \&zk_connect_str,
     wait => \&zk_wait
   );
-  my $cmd = shift(@args);
-  die "Unknown zookeeper command $cmd" unless exists $cmds{$cmd};
-  $cmds{$cmd}->(@args);
+  &dispatch(\%cmds, \@args);
 }
 
 sub zk_connect_str {
@@ -42,7 +46,6 @@ sub zk_connect_str {
 
 sub zk_wait {
   my @servers = &zk_get_servers();
-  use Data::Dumper;
   foreach my $svr (@servers) {
     my $zk_poll_cmd = "echo ruok | nc -w 2 $svr->{'host'} $svr->{'port'} | grep imok";
     print "Polling ZooKeeper Service ($zk_poll_cmd) ...";
@@ -55,7 +58,20 @@ sub zk_wait {
 }
 
 sub cluster {
+  my @args = @_;
+  my %cmds = (
+    boostrapstr => \&cluster_bootstrap_str,
+    wait => \&cluster_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
 
+sub cluster_bootstrap_str {
+  print("BOOT\n");
+}
+
+sub cluster_wait {
+  print("CLUSTER WAIT\n");
 }
 
 sub zk_get_connect_str {
