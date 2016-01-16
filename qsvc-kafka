@@ -1,18 +1,21 @@
 #!/usr/bin/env perl
 use strict;
-# use 5.010;
-
-#
-# kafka-svc zookeeper connectstr
-# kafka-svc zookeeper wait
-# kafka-svc cluster boostrapstr
-# kafka-svc cluster wait
 
 my $INSTANCE_VAR_NAME = 'KAFKA_INSTANCE_NAME';
 my $ZK_NAMESPACE_VAR_NAME = 'KAFKA_ZK_NAMESPACE';
 
+sub usage {
+  print <<EOF;
+  $0 zookeeper connectstr
+  $0 zookeeper wait
+  $0 cluster boostrapstr
+  $0 cluster wait
+EOF
+  exit(1);
+}
+
 sub main {
-  die "Missing params" unless scalar(@ARGV) > 0;
+  &usage unless @ARGV;
   my %cmds = (
     zookeeper => \&zookeeper,
     cluster => \&cluster
@@ -82,12 +85,4 @@ sub zk_get_servers {
 
 &main();
 
-#Get ZK prefix from cmd line arg
-# die "Must pass ZK service var prefix" unless scalar(@ARGV) > 0;
-# my ($zk_svc_var_prefix) = @ARGV;
-#
-# my $i = 1;
-# while (exists $ENV{"${zk_svc_var_prefix}${i}_SERVICE_HOST"}) {
-#   $i += 1;
-# }
-# print($i - 1);
+1;
