@@ -1,0 +1,93 @@
+#!/usr/bin/env perl
+use strict;
+# use 5.010;
+
+#
+# kafka-svc zookeeper connectstr
+# kafka-svc zookeeper wait
+# kafka-svc cluster boostrapstr
+# kafka-svc cluster wait
+
+my $INSTANCE_VAR_NAME = 'KAFKA_INSTANCE_NAME';
+my $ZK_NAMESPACE_VAR_NAME = 'KAFKA_ZK_NAMESPACE';
+
+sub main {
+  die "Missing params" unless scalar(@ARGV) > 0;
+  my %cmds = (
+    zookeeper => \&zookeeper,
+    cluster => \&cluster
+  );
+  my $cmd = shift(@ARGV);
+  die "Unknown command $cmd" unless exists $cmds{$cmd};
+  $cmds{$cmd}->(@ARGV);
+}
+
+sub zookeeper {
+  my @args = @_;
+  my %cmds = (
+    connectstr => \&zk_connect_str,
+    wait => \&zk_wait
+  );
+  my $cmd = shift(@args);
+  die "Unknown zookeeper command $cmd" unless exists $cmds{$cmd};
+  $cmds{$cmd}->(@args);
+}
+
+sub zk_connect_str {
+  print &zk_get_connect_str();
+}
+
+sub zk_wait {
+  my @servers = &zk_get_servers();
+  use Data::Dumper;
+  foreach my $svr (@servers) {
+    my $zk_poll_cmd = "echo ruok | nc -w 2 $svr->{'host'} $svr->{'port'} | grep imok";
+    print "Polling ZooKeeper Service ($zk_poll_cmd) ...";
+    until (system($zk_poll_cmd) == 0) {
+      print('.');
+      sleep(2);
+    };
+    print "OK\n";
+  }
+}
+
+sub cluster {
+
+}
+
+sub zk_get_connect_str {
+  my @servers = &zk_get_servers();
+  my @svr_strs = map { "$_->{'host'}:$_->{'port'}" } @servers;
+  my $zk_path = $ENV{$ZK_NAMESPACE_VAR_NAME} || '/';
+  return join(',', @svr_strs) . $zk_path;
+}
+
+sub zk_get_servers {
+  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
+  my $id = $ENV{$INSTANCE_VAR_NAME};
+  my $zk_svc_var_prefix = uc("$id-zookeeper-");
+  $zk_svc_var_prefix =~ tr/-/_/;
+  my @servers = ();
+  my $i = 1;
+  do {
+    my $host_var = "${zk_svc_var_prefix}${i}_SERVICE_HOST";
+    die "Must set $host_var env var" unless exists $ENV{$host_var};
+    my $client_port_var = "${zk_svc_var_prefix}${i}_SERVICE_PORT_CLIENT";
+    die "Must set $client_port_var env var" unless exists $ENV{$client_port_var};
+    push @servers, {host => $ENV{$host_var}, port => $ENV{$client_port_var}};
+    $i += 1;
+  } while (exists $ENV{"${zk_svc_var_prefix}${i}_SERVICE_HOST"});
+  return @servers;
+}
+
+&main();
+
+#Get ZK prefix from cmd line arg
+# die "Must pass ZK service var prefix" unless scalar(@ARGV) > 0;
+# my ($zk_svc_var_prefix) = @ARGV;
+#
+# my $i = 1;
+# while (exists $ENV{"${zk_svc_var_prefix}${i}_SERVICE_HOST"}) {
+#   $i += 1;
+# }
+# print($i - 1);
