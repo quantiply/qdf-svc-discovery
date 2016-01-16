@@ -60,14 +60,14 @@ sub zk_wait {
 sub cluster {
   my @args = @_;
   my %cmds = (
-    boostrapstr => \&cluster_bootstrap_str,
+    bootstrapstr => \&cluster_bootstrap_str,
     wait => \&cluster_wait
   );
   &dispatch(\%cmds, \@args);
 }
 
 sub cluster_bootstrap_str {
-  print("BOOT\n");
+  print &get_bootstrap_str();
 }
 
 sub cluster_wait {
@@ -97,6 +97,30 @@ sub zk_get_servers {
     $i += 1;
   } while (exists $ENV{"${zk_svc_var_prefix}${i}_SERVICE_HOST"});
   return @servers;
+}
+
+sub get_bootstrap_str {
+  my @brokers = &get_brokers();
+  my @broker_strs = map { "$_->{'host'}:$_->{'port'}" } @brokers;
+  return join(',', @broker_strs);
+}
+
+sub get_brokers {
+  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
+  my $id = $ENV{$INSTANCE_VAR_NAME};
+  my $svc_var_prefix = uc("$id-broker-");
+  $svc_var_prefix =~ tr/-/_/;
+  my @brokers = ();
+  my $i = 1;
+  do {
+    my $host_var = "${svc_var_prefix}${i}_SERVICE_HOST";
+    die "Must set $host_var env var" unless exists $ENV{$host_var};
+    my $port_var = "${svc_var_prefix}${i}_SERVICE_PORT_BROKER";
+    die "Must set $port_var env var" unless exists $ENV{$port_var};
+    push @brokers, {host => $ENV{$host_var}, port => $ENV{$port_var}};
+    $i += 1;
+  } while (exists $ENV{"${svc_var_prefix}${i}_SERVICE_HOST"});
+  return @brokers;
 }
 
 &main();
