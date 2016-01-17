@@ -2,6 +2,8 @@
 use strict;
 use File::Spec;
 
+BEGIN { $| = 1; }
+
 my $INSTANCE_VAR_NAME = 'KAFKA_INSTANCE_NAME';
 my $ZK_NAMESPACE_VAR_NAME = 'KAFKA_ZK_NAMESPACE';
 
@@ -13,6 +15,7 @@ sub usage {
   $0 cluster boostrapstr
   $0 cluster wait
   $0 schemaregistry url
+  $0 schemaregistry wait
 EOF
   exit(1);
 }
@@ -57,13 +60,24 @@ sub cluster {
 sub schemaregistry {
   my @args = @_;
   my %cmds = (
-    url => \&registry_url
+    url => \&registry_url,
+    wait => \&registry_wait
   );
   &dispatch(\%cmds, \@args);
 }
 
 sub registry_url {
   print &get_registry_url();
+}
+
+sub registry_wait {
+  my $registry_url = &get_registry_url();
+  print "Polling Schema Registry url ($registry_url) ...";
+  until (system("curl --output /dev/null --silent --head --fail $registry_url") == 0) {
+    printf('.');
+    sleep 2;
+  }
+  print "OK\n";
 }
 
 sub zk_connect_str {
@@ -99,6 +113,7 @@ sub cluster_wait {
   print "Waiting for at least $num_svcs Kafka brokers ($brokers_url)\n";
 
   #Non-existent: [{"title":"* Exception *","key":"*","isLazy":false,"expand":false}]
+  #Success: [{"title":"101090","key":"/brokers/ids/101090","isLazy":true,"expand":false},{"title":"101111","key":"/brokers/ids/101111","isLazy":true,"expand":false},{"title":"1012144","key":"/brokers/ids/1012144","isLazy":true,"expand":false}]
   my $active_brokers_cmd = "curl --silent '$brokers_url' | jq 'map(select(.key != \"*\")) | length'";
   my $num_found = `$active_brokers_cmd` + 0;
   until ($num_found >= $num_svcs) {
