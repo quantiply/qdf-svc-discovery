@@ -71,7 +71,21 @@ sub cluster_bootstrap_str {
 }
 
 sub cluster_wait {
-  print("CLUSTER WAIT\n");
+  my $exhibitor_url = &get_exhibitor_url();
+  my $num_svcs = scalar(&get_brokers());
+  my $zk_path = $ENV{$ZK_NAMESPACE_VAR_NAME} || '/';
+  my $brokers_url = "$exhibitor_url/exhibitor/v1/explorer/node?key=${zk_path}%2Fbrokers%2Fids";
+  print "Waiting for at least $num_svcs Kafka brokers ($brokers_url)\n";
+
+  #Non-existent: [{"title":"* Exception *","key":"*","isLazy":false,"expand":false}]
+  my $active_brokers_cmd = "curl --silent '$brokers_url' | jq 'map(select(.key != \"*\")) | length'";
+  my $num_found = `$active_brokers_cmd` + 0;
+  until ($num_found >= $num_svcs) {
+    print "Active Kafka brokers: $num_found\n";
+    sleep 2;
+    $num_found = `$active_brokers_cmd`;
+  }
+  print "Found $num_found brokers\n";
 }
 
 sub zk_get_connect_str {
@@ -97,6 +111,18 @@ sub zk_get_servers {
     $i += 1;
   } while (exists $ENV{"${zk_svc_var_prefix}${i}_SERVICE_HOST"});
   return @servers;
+}
+
+sub get_exhibitor_url {
+  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
+  my $id = $ENV{$INSTANCE_VAR_NAME};
+  my $exhibitor_svc_var = uc("$id-exhibitor");
+  $exhibitor_svc_var =~ tr/-/_/;
+  my $host_var = "${exhibitor_svc_var}_SERVICE_HOST";
+  die "Must set $host_var env var" unless exists $ENV{$host_var};
+  my $port_var = "${exhibitor_svc_var}_SERVICE_PORT_WEB";
+  die "Must set $port_var env var" unless exists $ENV{$port_var};
+  return "http://$ENV{$host_var}:$ENV{$port_var}";
 }
 
 sub get_bootstrap_str {
