@@ -11,6 +11,7 @@ sub usage {
   $0 cluster numbrokers
   $0 cluster boostrapstr
   $0 cluster wait
+  $0 schemaregistry url
 EOF
   exit(1);
 }
@@ -20,7 +21,8 @@ sub main {
   my @args = @ARGV;
   my %cmds = (
     zookeeper => \&zookeeper,
-    cluster => \&cluster
+    cluster => \&cluster,
+    schemaregistry => \&schemaregistry
   );
   &dispatch(\%cmds, \@args);
 }
@@ -41,6 +43,28 @@ sub zookeeper {
   &dispatch(\%cmds, \@args);
 }
 
+sub cluster {
+  my @args = @_;
+  my %cmds = (
+    numbrokers => \&cluster_num_brokers,
+    bootstrapstr => \&cluster_bootstrap_str,
+    wait => \&cluster_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub schemaregistry {
+  my @args = @_;
+  my %cmds = (
+    url => \&registry_url
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub registry_url {
+  print &get_registry_url();
+}
+
 sub zk_connect_str {
   print &zk_get_connect_str();
 }
@@ -56,16 +80,6 @@ sub zk_wait {
     };
     print "OK\n";
   }
-}
-
-sub cluster {
-  my @args = @_;
-  my %cmds = (
-    numbrokers => \&cluster_num_brokers,
-    bootstrapstr => \&cluster_bootstrap_str,
-    wait => \&cluster_wait
-  );
-  &dispatch(\%cmds, \@args);
 }
 
 sub cluster_num_brokers {
@@ -92,6 +106,18 @@ sub cluster_wait {
     $num_found = `$active_brokers_cmd`;
   }
   print "Found $num_found brokers\n";
+}
+
+sub get_registry_url {
+  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
+  my $id = $ENV{$INSTANCE_VAR_NAME};
+  my $registry_svc_var = uc("$id-schema-registry");
+  $registry_svc_var =~ tr/-/_/;
+  my $host_var = "${registry_svc_var}_SERVICE_HOST";
+  die "Must set $host_var env var" unless exists $ENV{$host_var};
+  my $port_var = "${registry_svc_var}_SERVICE_PORT_HTTP";
+  die "Must set $port_var env var" unless exists $ENV{$port_var};
+  return "http://$ENV{$host_var}:$ENV{$port_var}";
 }
 
 sub zk_get_connect_str {
