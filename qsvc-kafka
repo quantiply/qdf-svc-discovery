@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 use strict;
+use File::Spec;
 
 my $INSTANCE_VAR_NAME = 'KAFKA_INSTANCE_NAME';
 my $ZK_NAMESPACE_VAR_NAME = 'KAFKA_ZK_NAMESPACE';
@@ -93,8 +94,8 @@ sub cluster_bootstrap_str {
 sub cluster_wait {
   my $exhibitor_url = &get_exhibitor_url();
   my $num_svcs = scalar(&get_brokers());
-  my $zk_path = $ENV{$ZK_NAMESPACE_VAR_NAME} || '/';
-  my $brokers_url = "$exhibitor_url/exhibitor/v1/explorer/node?key=${zk_path}%2Fbrokers%2Fids";
+  my $zk_prefix = &get_zk_namespace();
+  my $brokers_url = "$exhibitor_url/exhibitor/v1/explorer/node?key=" . File::Spec->canonpath("/${zk_prefix}/brokers/ids");
   print "Waiting for at least $num_svcs Kafka brokers ($brokers_url)\n";
 
   #Non-existent: [{"title":"* Exception *","key":"*","isLazy":false,"expand":false}]
@@ -120,11 +121,15 @@ sub get_registry_url {
   return "http://$ENV{$host_var}:$ENV{$port_var}";
 }
 
+sub get_zk_namespace {
+  return $ENV{$ZK_NAMESPACE_VAR_NAME} || '';
+}
+
 sub zk_get_connect_str {
   my @servers = &zk_get_servers();
   my @svr_strs = map { "$_->{'host'}:$_->{'port'}" } @servers;
-  my $zk_path = $ENV{$ZK_NAMESPACE_VAR_NAME} || '/';
-  return join(',', @svr_strs) . $zk_path;
+  my $zk_path = &get_zk_namespace();
+  return join(',', @svr_strs) . File::Spec->canonpath("/$zk_path");
 }
 
 sub zk_get_servers {
