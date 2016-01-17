@@ -8,6 +8,7 @@ sub usage {
   print <<EOF;
   $0 zookeeper connectstr
   $0 zookeeper wait
+  $0 cluster numbrokers
   $0 cluster boostrapstr
   $0 cluster wait
 EOF
@@ -60,10 +61,15 @@ sub zk_wait {
 sub cluster {
   my @args = @_;
   my %cmds = (
+    numbrokers => \&cluster_num_brokers,
     bootstrapstr => \&cluster_bootstrap_str,
     wait => \&cluster_wait
   );
   &dispatch(\%cmds, \@args);
+}
+
+sub cluster_num_brokers {
+  print scalar(&get_brokers());
 }
 
 sub cluster_bootstrap_str {
