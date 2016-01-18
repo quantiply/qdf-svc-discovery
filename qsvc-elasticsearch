@@ -1,0 +1,104 @@
+#!/usr/bin/env perl
+use strict;
+
+#Auto-flush stdout
+BEGIN { $| = 1; }
+
+my $INSTANCE_VAR_NAME = 'ELASTICSEARCH_INSTANCE_NAME';
+
+sub usage {
+  print <<EOF;
+  $0 cluster httpurl
+  $0 cluster transport host
+  $0 cluster transport port
+  $0 cluster wait
+EOF
+  exit(1);
+}
+
+sub main {
+  &usage unless @ARGV;
+  my @args = @ARGV;
+  my %cmds = (
+    cluster => \&cluster
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub cluster {
+  my @args = @_;
+  my %cmds = (
+    httpurl => \&cluster_http_url,
+    transport => \&cluster_transport,
+    wait => \&cluster_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub cluster_transport {
+  my @args = @_;
+  my %cmds = (
+    host => \&cluster_transport_host,
+    port => \&cluster_transport_port
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub cluster_http_url {
+  print &get_cluster_url();
+}
+
+sub cluster_transport_host {
+  my ($host) = &get_svc_vars('transport', '_SERVICE_HOST');
+  print $host;
+}
+
+sub cluster_transport_port {
+  my ($port) = &get_svc_vars('transport', '_SERVICE_PORT_TRANSPORT');
+  print $port;
+}
+
+sub cluster_wait {
+  &poll_url("HTTP Endpoint", &get_cluster_url());
+}
+
+sub get_cluster_url {
+  my ($host, $port) = &get_svc_vars('http', '_SERVICE_HOST', '_SERVICE_PORT_HTTP');
+  return "http://$host:$port";
+}
+
+sub dispatch {
+  my ($cmds, $args) = @_;
+  my $cmd = shift(@$args);
+  &usage() unless exists $cmds->{$cmd};
+  $cmds->{$cmd}->(@$args);
+}
+
+sub poll_url {
+  my ($name, $url) = @_;
+  print "Polling $name url ($url) ...";
+  until (system("curl --output /dev/null --silent --head --fail $url") == 0) {
+    printf('.');
+    sleep 2;
+  }
+  print "OK\n";
+}
+
+sub get_svc_vars {
+  my $svc_name = shift(@_);
+  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
+  my $id = $ENV{$INSTANCE_VAR_NAME};
+  my $svc_var_prefix = uc("$id-$svc_name");
+  $svc_var_prefix =~ tr/-/_/;
+  my @vars = ();
+  foreach my $suffix (@_) {
+    my $svc_var = "${svc_var_prefix}${suffix}";
+    die "Must set $svc_var env var" unless exists $ENV{$svc_var};
+    push @vars, $ENV{$svc_var};
+  }
+  return @vars;
+}
+
+&main();
+
+1;
