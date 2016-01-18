@@ -2,6 +2,7 @@
 use strict;
 use File::Spec;
 
+#Auto-flush stdout
 BEGIN { $| = 1; }
 
 my $INSTANCE_VAR_NAME = 'KAFKA_INSTANCE_NAME';
@@ -11,11 +12,16 @@ sub usage {
   print <<EOF;
   $0 zookeeper connectstr
   $0 zookeeper wait
+  $0 zookeeper exhibitorurl
   $0 cluster numbrokers
   $0 cluster boostrapstr
   $0 cluster wait
   $0 schemaregistry url
   $0 schemaregistry wait
+  $0 restproxy url
+  $0 restproxy wait
+  $0 manager url
+  $0 manager wait
 EOF
   exit(1);
 }
@@ -26,7 +32,9 @@ sub main {
   my %cmds = (
     zookeeper => \&zookeeper,
     cluster => \&cluster,
-    schemaregistry => \&schemaregistry
+    schemaregistry => \&schemaregistry,
+    restproxy => \&restproxy,
+    manager => \&manager
   );
   &dispatch(\%cmds, \@args);
 }
@@ -42,7 +50,8 @@ sub zookeeper {
   my @args = @_;
   my %cmds = (
     connectstr => \&zk_connect_str,
-    wait => \&zk_wait
+    wait => \&zk_wait,
+    exhibitorurl => \&zk_exhibitor_url
   );
   &dispatch(\%cmds, \@args);
 }
@@ -71,9 +80,47 @@ sub registry_url {
 }
 
 sub registry_wait {
-  my $registry_url = &get_registry_url();
-  print "Polling Schema Registry url ($registry_url) ...";
-  until (system("curl --output /dev/null --silent --head --fail $registry_url") == 0) {
+  &poll_url("Schema Registry", &get_registry_url());
+}
+
+sub restproxy {
+  my @args = @_;
+  my %cmds = (
+    url => \&proxy_url,
+    wait => \&proxy_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub proxy_url {
+  print &get_proxy_url();
+}
+
+sub proxy_wait {
+  &poll_url("REST Proxy", &get_proxy_url());
+}
+
+sub manager {
+  my @args = @_;
+  my %cmds = (
+    url => \&manager_url,
+    wait => \&manager_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub manager_url {
+  print &get_manager_url();
+}
+
+sub manager_wait {
+  &poll_url("Kafka Manager", &get_manager_url());
+}
+
+sub poll_url {
+  my ($name, $url) = @_;
+  print "Polling $name url ($url) ...";
+  until (system("curl --output /dev/null --silent --head --fail $url") == 0) {
     printf('.');
     sleep 2;
   }
@@ -95,6 +142,10 @@ sub zk_wait {
     };
     print "OK\n";
   }
+}
+
+sub zk_exhibitor_url {
+  print &get_exhibitor_url();
 }
 
 sub cluster_num_brokers {
@@ -124,16 +175,19 @@ sub cluster_wait {
   print "Found $num_found brokers\n";
 }
 
+sub get_proxy_url {
+  my ($host, $port) = &get_svc_vars('proxy', '_SERVICE_HOST', '_SERVICE_PORT_HTTP');
+  return "http://$host:$port";
+}
+
+sub get_manager_url {
+  my ($host, $port) = &get_svc_vars('manager', '_SERVICE_HOST', '_SERVICE_PORT_WEB');
+  return "http://$host:$port";
+}
+
 sub get_registry_url {
-  die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
-  my $id = $ENV{$INSTANCE_VAR_NAME};
-  my $registry_svc_var = uc("$id-schema-registry");
-  $registry_svc_var =~ tr/-/_/;
-  my $host_var = "${registry_svc_var}_SERVICE_HOST";
-  die "Must set $host_var env var" unless exists $ENV{$host_var};
-  my $port_var = "${registry_svc_var}_SERVICE_PORT_HTTP";
-  die "Must set $port_var env var" unless exists $ENV{$port_var};
-  return "http://$ENV{$host_var}:$ENV{$port_var}";
+  my ($host, $port) = &get_svc_vars('schema-registry', '_SERVICE_HOST', '_SERVICE_PORT_HTTP');
+  return "http://$host:$port";
 }
 
 sub get_zk_namespace {
@@ -166,15 +220,23 @@ sub zk_get_servers {
 }
 
 sub get_exhibitor_url {
+  my ($host, $port) = &get_svc_vars('exhibitor', '_SERVICE_HOST', '_SERVICE_PORT_WEB');
+  return "http://$host:$port";
+}
+
+sub get_svc_vars {
+  my $svc_name = shift(@_);
   die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
   my $id = $ENV{$INSTANCE_VAR_NAME};
-  my $exhibitor_svc_var = uc("$id-exhibitor");
-  $exhibitor_svc_var =~ tr/-/_/;
-  my $host_var = "${exhibitor_svc_var}_SERVICE_HOST";
-  die "Must set $host_var env var" unless exists $ENV{$host_var};
-  my $port_var = "${exhibitor_svc_var}_SERVICE_PORT_WEB";
-  die "Must set $port_var env var" unless exists $ENV{$port_var};
-  return "http://$ENV{$host_var}:$ENV{$port_var}";
+  my $svc_var_prefix = uc("$id-$svc_name");
+  $svc_var_prefix =~ tr/-/_/;
+  my @vars = ();
+  foreach my $suffix (@_) {
+    my $svc_var = "${svc_var_prefix}${suffix}";
+    die "Must set $svc_var env var" unless exists $ENV{$svc_var};
+    push @vars, $ENV{$svc_var};
+  }
+  return @vars;
 }
 
 sub get_bootstrap_str {
