@@ -64,7 +64,7 @@ sub get_connect_str {
 sub get_servers {
   die "Need to set $INSTANCE_VAR_NAME env var" unless exists $ENV{$INSTANCE_VAR_NAME};
   my $id = $ENV{$INSTANCE_VAR_NAME};
-  my $zk_svc_var_prefix = uc("$id-server-");
+  my $zk_svc_var_prefix = uc("$id-zookeeper-");
   $zk_svc_var_prefix =~ tr/-/_/;
   my @servers = ();
   my $i = 1;
