@@ -14,7 +14,7 @@ sub usage {
   $0 zookeeper wait
   $0 zookeeper exhibitorurl
   $0 cluster numbrokers
-  $0 cluster boostrapstr
+  $0 cluster bootstrapstr
   $0 cluster wait
   $0 schemaregistry url
   $0 schemaregistry wait
