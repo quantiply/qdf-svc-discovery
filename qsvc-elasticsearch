@@ -9,6 +9,8 @@ my $INSTANCE_VAR_NAME = 'ELASTICSEARCH_INSTANCE_NAME';
 sub usage {
   print <<EOF;
   $0 cluster httpurl
+  $0 cluster http host
+  $0 cluster http port
   $0 cluster transport host
   $0 cluster transport port
   $0 cluster wait
@@ -29,8 +31,18 @@ sub cluster {
   my @args = @_;
   my %cmds = (
     httpurl => \&cluster_http_url,
+    http => \&cluster_http,
     transport => \&cluster_transport,
     wait => \&cluster_wait
+  );
+  &dispatch(\%cmds, \@args);
+}
+
+sub cluster_http {
+  my @args = @_;
+  my %cmds = (
+    host => \&cluster_http_host,
+    port => \&cluster_http_port
   );
   &dispatch(\%cmds, \@args);
 }
@@ -48,6 +60,16 @@ sub cluster_http_url {
   print &get_cluster_url();
 }
 
+sub cluster_http_host {
+  my ($host) = &get_svc_vars('http', '_SERVICE_HOST');
+  print $host;
+}
+
+sub cluster_http_port {
+  my ($port) = &get_svc_vars('http', '_SERVICE_PORT_HTTP');
+  print $port;
+}
+
 sub cluster_transport_host {
   my ($host) = &get_svc_vars('transport', '_SERVICE_HOST');
   print $host;
@@ -63,7 +85,8 @@ sub cluster_wait {
 }
 
 sub get_cluster_url {
-  my ($host, $port) = &get_svc_vars('http', '_SERVICE_HOST', '_SERVICE_PORT_HTTP');
+  my $host = &cluster_http_host();
+  my $port = &cluster_http_port();
   return "http://$host:$port";
 }
 
