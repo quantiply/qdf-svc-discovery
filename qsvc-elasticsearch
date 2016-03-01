@@ -60,14 +60,22 @@ sub cluster_http_url {
   print &get_cluster_url();
 }
 
-sub cluster_http_host {
+sub get_http_host {
   my ($host) = &get_svc_vars('http', '_SERVICE_HOST');
-  print $host;
+  return $host;
+}
+
+sub cluster_http_host {
+  print &get_http_host();
+}
+
+sub get_http_port {
+  my ($port) = &get_svc_vars('http', '_SERVICE_PORT_HTTP');
+  return $port;
 }
 
 sub cluster_http_port {
-  my ($port) = &get_svc_vars('http', '_SERVICE_PORT_HTTP');
-  print $port;
+  print &get_http_port();
 }
 
 sub cluster_transport_host {
@@ -85,8 +93,8 @@ sub cluster_wait {
 }
 
 sub get_cluster_url {
-  my $host = &cluster_http_host();
-  my $port = &cluster_http_port();
+  my $host = &get_http_host();
+  my $port = &get_http_port();
   return "http://$host:$port";
 }
 
